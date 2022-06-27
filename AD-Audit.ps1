@@ -1,4 +1,4 @@
-﻿cls
+cls
 # Variables
 $email_ignore_list = ''
 #$ignore_string = ''
@@ -125,18 +125,32 @@ Function Get-TrustedDelegationAccounts() {
         | Export-CSV "$outputdir\Accounts\delegated_accounts.csv" -NoTypeInformation
 }
 # To Do   
-# AD Replications this month 
+# AD Replications this month - users
 Function Get-UserReplicationEvents() {
     $users = Get-ADUser -Filter * -Properties * | Where { $_.Enabled -eq $True}
-    $this_month = Get-Date -Format "yyyy-MM"
+    $this_month = Get-Date -Year (Get-Date).Year -Month (Get-Date).Month -Day 1 -Hour 0 -Minute 0 -Second 0 -Millisecond 0
+    $metadata_array = New-Object System.Collections.ArrayList
     ForEach ($user in $users) {
-        Get-AdReplicationAttributeMetadata -Object (Get-ADUser $user) -Server $DomainController -Properties *  -IncludeDeletedObjects –ShowAllLinkedValues | Where-Object {$_.LastOriginatingChangeTime -contains $this_month} `
+        $metadata = Get-AdReplicationAttributeMetadata -Object (Get-ADUser $user) -Server $DomainController -Properties *  -IncludeDeletedObjects –ShowAllLinkedValues | where {$_.LastOriginatingChangeTime -gt $this_month} `
         | Select -Property LastOriginatingChangeTime, AttributeName, AttributeValue, LastOriginatingChangeDirectoryServerIdentity, LastOriginatingChangeUsn, LastOriginatingDeleteTime, LocalChangeUsn, Object, Server, Version `
         | Sort-Object -Property LastOriginatingChangeTime `
-        | Export-CSV "$outputdir\Accounts\replication_events.csv" -NoTypeInformation
+        $metadata_object = New-Object System.Object
+        $metadata_object | Add-Member -MemberType NoteProperty -Name "Object" -Value $metadata.Object
+        $metadata_object | Add-Member -MemberType NoteProperty -Name "AttributeName" -Value $metadata.AttributeName
+        $metadata_object | Add-Member -MemberType NoteProperty -Name "AttributeValue" -Value $metadata.AttributeValue
+        $metadata_object | Add-Member -MemberType NoteProperty -Name "LastOriginatingChangeTime" -Value $metadata.LastOriginatingChangeTime
+        $metadata_object | Add-Member -MemberType NoteProperty -Name "Server" -Value $metadata.Server
+        if ($metadata_object) {
+            $metadata_array.Add($metadata_object) | Out-Null
+        }
     }
+    $metadata_array | Export-CSV "$outputdir\Accounts\replication_events.csv" -NoTypeInformation
 }
- 
+
+# AD Replications this month - GPO (?)
+
+# AD Replications this month - Groups
+
 # Enumerate who can access a machine object
 
 
@@ -147,4 +161,4 @@ Get-UsersGroups
 Get-PwdIssues
 Get-OrgUnitRights
 Get-TrustedDelegationAccounts
-#Get-UserReplicationEvents
+Get-UserReplicationEvents
